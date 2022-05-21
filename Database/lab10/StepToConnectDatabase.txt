@@ -1,0 +1,18 @@
+		Connect to database
+
+1. copy doan nay ve dán vào pom.xml
+	<dependencies>
+		
+		<dependency>
+    			<groupId>com.microsoft.sqlserver</groupId>
+    			<artifactId>mssql-jdbc</artifactId>
+    			<version>10.2.0.jre8</version>
+		</dependency>
+	</dependencies>
+
+2. vào file main.java: import java.sql.DriverManage;
+3.tạo file sql có tên là test.sql
+4. tạo tài khoãn và mật khẩu cho sql đó: admin-111111
+5.vào file main.java,  tạo String url = "jdbc:sqlserver://507-20;user=admin;password=111111;databaseName=Lab10;encrypt=true;trustServerCertificate=true;";\
+	(nên chú ý 507-20 là admin của máy cài sql.)
+6. 
