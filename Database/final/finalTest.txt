@@ -1,0 +1,174 @@
+1
+	a. select c.* from receipt r join customer c on r.CusID = c.CusID 
+		where Year(r.date) = 2020 and Month(r.date) between 7 and 9 and c.address = 'Ho Chi Minh'
+
+	b. select Car.* from Car, ReceiptDetail RD, manufacturer m, Receipt r, customer c 
+		where RD.CarID = car.CarID and RD.recID = r.recID and r.CusID = c.CusID  and Car.manuID= m.manuID
+			and m.Name='Yamaha' and c.address = 'TPHCM'
+
+	c. select x.* from ChitietHoaDon CH join XeMay x on CH.xeID = x.xeID
+							join Hoadon h on h.hoadonID = CH.hoaDonID
+		where Year(h.ngaylap) = 2020
+		group by CH.maxe
+		having count(CH.repID)>= ALL(select count(CH1) from ChitietHoaDon CH1)
+
+	d. select x.* from ChitietHoaDon CH left join XeMay x on CH.xeID = x.xeID
+							join Hoadon h on h.hoadonID = CH.hoaDonID
+		where Year(h.ngaylap) = 2020 and x.maxe not in (select CH1.maxe from ChitietHoaDon CH1)
+
+	e. select nsx.* from ChitietHoaDon CH, XeMay x, Hoadon h, nhasanxuat nsx  
+		where Year(h.ngaylap) = 2020 and CH.xeID = x.xeID and h.hoadonID = CH.hoaDonID
+			and nsx.maNSX = x.maNSX
+		group by CH.maxe
+		having count(CH.repID)>= ALL(select count(CH1.sohoadon) from ChitietHoaDon CH1 and Hoadon h1
+								where CH1.maxe = CH.maxe and h1.sohoadon = CH1.soHoadon and year(h1.ngaylap) =2020
+									group by CH1.maxe)
+
+	f. select month(h.ngaylap), count(CH.repID) from ChitietHoaDon CH, Hoadon h
+		where Year(h.ngaylap) = 2020 and h.hoadonID = CH.hoaDonID
+		group by CH.maxe
+
+2
+	a. create function a(@Sohoadon int, @ngayLap date, @CusID varchar(255))
+	  returns varchar(255)
+	as
+	begin	
+		declare @error varchar(255)
+		if (@Sohoadon is null) 
+			set @error= "Sohoa don is not supported null value"
+		else if (@CusID not in (select CusID from khachhang)) 
+			set @error= "Sohoa don is not customer"
+		else 
+		begin
+			insert into hoadon(sohoadon,ngayLap,CusID) values(@Sohoadon,@ngayLap,@CusID)
+			set @error= "success"
+		end
+		return @error
+	end
+
+	b. create function b(@soHoadon varchar(255), @maxe varchar(255), @quantity int, @dongia float)
+	returns varchar(255)
+	as
+	begin
+		
+		declare @notification varchar(255)
+		if(@soHoadon is null and @sohoadon not in (select h.sohoadon from hoadon h)){
+			set @notification = "sohoadon is not null"
+			rollback trans
+		}
+		else if(@maxe is null){
+			set @notification = "maxe is not null"
+			rollback trans
+		}
+		else if(@quantity <> (select x.soluong from xemay x where x.maxe = @maxe)){
+			set @notification = "quantity is not higher xe's quantity"
+			rollback trans
+		}
+		else if(@dongia <> (select x.dongia from xemay x where x.maxe = @maxe)){
+			set @notification = "dongia is not higher xe's dongia "
+			rollback trans
+		}
+		else{
+			insert into chitiethoadon values(@soHoadon, @maxe , @quantity, @dongia)
+			set @notification = "add success at chitiet hoa don"
+		}
+		return @notification
+
+	end
+	
+	c. create function c(@x int)
+	returns int
+	as
+	begin
+		declare @quantity int
+		select @quantity = cthd.soluong from hoadon h join chitiethaodon cthd on h.sohoadon = cthd.sohoadon
+		where year(h.ngaylap) = @x
+		group by cthd.sohoadon
+		return @quantity
+	end
+
+3.
+	a. create proc a
+		@maxe varchar(255), @tenxe varchar(255), @manhasanxuat varchar(255), @soluong int, @dongia float
+	as
+	begin
+		if(@maxe is null){
+			raiserror("maxe is not null", 16,1)
+			rollback trans
+		}
+		else if(@tenxe is null){
+			raiserror("tenxe is not null", 16,1)
+			rollback trans
+		}
+		else if(@manhasanxuat is null and @manhasanxuat not in (select @manhasanxuat from nhasanxuat)){
+			raiserror("manhasanxuat is not null", 16,1)
+			rollback trans
+		}
+		else if(@soluong < 0 and @dongia < 0){
+			raiserror(" so luong > 0 and dongio > 0", 16,1)
+			rollback trans
+		}
+		else{
+			insert into xemay values(@maxe, @tenxe, @manhasanxuat , @soluong , @dongia)
+		}
+	end
+
+	b. create proc b
+			@maxe varchar(255)
+	as
+	begin
+		if(@maxe in (select maxe from chitiethoadon)){
+			raiserror("hog dc xoa", 16,1)
+		}
+		else{delete from xemay where @maxe = maxe}
+	end
+
+	c. create proc c 
+	as
+	begin
+		select sohoadon, soluong*dongia as tongtien from chitiethoadon ct
+	end
+
+4
+	a. create trigger a on hoadon
+	for insert
+	as
+	begin
+		declare @sohoadon varchar(255)
+		declare @CusID varchar(255)
+		declare @ngaylap date
+		select @sohoadon = i.sohoadon, @CusID = i.makhachhang, @ngaylap = i.ngaylap from inserted i
+		if(@sohoadon is null){
+			raiserror("sohoadon is not null",16,1)
+			rollback trans
+		}
+		if (@ngaylap > getdate()){
+			raiserror("sohoadon is not null",16,1)
+			rollback trans
+		}
+		if(@CusID not in (select makhachnag from khachhang)){raiserror("sohoadon is not null",16,1)
+			rollback trans}
+	end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
